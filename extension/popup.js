@@ -22,38 +22,39 @@ document.addEventListener('DOMContentLoaded', function() {
     messageInput.value = '';
     appendMessage(message, true);
 
+    const requestData = {
+      model: "claude-3-opus-20240229",
+      messages: [{
+        role: "user",
+        content: message
+      }]
+    };
+
+    console.log('Sending request:', requestData); // Para debugging
+
     try {
       const response = await fetch('https://claude-extension.vercel.app/api/claude', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          model: "claude-3-opus-20240229",
-          max_tokens: 1024,
-          temperature: 0.7,
-          messages: [{
-            role: "user",
-            content: message
-          }],
-          system: "You are Claude, a helpful AI assistant. Provide clear, concise responses."
-        })
+        body: JSON.stringify(requestData)
       });
 
+      const responseText = await response.text();
+      console.log('Raw response:', responseText); // Para debugging
+
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('API Error Response:', errorText);
-        throw new Error(`HTTP error! status: ${response.status}, details: ${errorText}`);
+        throw new Error(`HTTP error! status: ${response.status}, response: ${responseText}`);
       }
 
-      const data = await response.json();
-      console.log('Response from Claude:', data);
+      const data = JSON.parse(responseText);
+      console.log('Parsed response:', data); // Para debugging
 
-      if (data && data.content && data.content[0] && data.content[0].text) {
+      if (data && data.content) {
         appendMessage(data.content[0].text, false);
       } else {
-        console.error('Unexpected response format:', data);
-        appendMessage('Error: Unexpected response format from Claude', false);
+        throw new Error('Invalid response format from server');
       }
     } catch (error) {
       console.error('Error details:', error);
