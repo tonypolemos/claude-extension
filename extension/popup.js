@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', function() {
     appendMessage(message, true);
 
     try {
-      const response = await fetch('https://your-vercel-app.vercel.app/api/claude', {
+      const response = await fetch('https://claude-extension.vercel.app/api/claude', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
