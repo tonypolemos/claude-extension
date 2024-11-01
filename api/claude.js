@@ -13,24 +13,23 @@ module.exports = async (req, res) => {
   }
 
   if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed' });
-    return;
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const apiKey = process.env.CLAUDE_API_KEY;
+  if (!apiKey) {
+    return res.status(500).json({ error: 'API key not configured' });
   }
 
   try {
-    if (!process.env.CLAUDE_API_KEY) {
-      throw new Error('CLAUDE_API_KEY not configured');
-    }
+    console.log('Received request body:', req.body); // Para debugging
 
-    const requestBody = {
-      model: req.body.model || "claude-3-opus-20240229",
-      max_tokens: req.body.max_tokens || 1024,
-      temperature: req.body.temperature || 0.7,
-      messages: req.body.messages,
-      system: req.body.system
+    const claudeRequest = {
+      model: req.body.model,
+      messages: req.body.messages
     };
 
-    console.log('Sending request to Claude:', JSON.stringify(requestBody));
+    console.log('Sending to Claude:', claudeRequest); // Para debugging
 
     const options = {
       hostname: 'api.anthropic.com',
@@ -38,12 +37,12 @@ module.exports = async (req, res) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': process.env.CLAUDE_API_KEY,
+        'x-api-key': apiKey,
         'anthropic-version': '2023-06-01'
       }
     };
 
-    return new Promise((resolve, reject) => {
+    const claudeResponse = await new Promise((resolve, reject) => {
       const proxyReq = https.request(options, (proxyRes) => {
         let data = '';
         
@@ -52,30 +51,31 @@ module.exports = async (req, res) => {
         });
         
         proxyRes.on('end', () => {
-          try {
-            console.log('Raw response from Claude:', data);
-            const responseData = JSON.parse(data);
-            res.status(proxyRes.statusCode).json(responseData);
-            resolve();
-          } catch (error) {
-            console.error('Error parsing response:', error);
-            res.status(500).json({ error: 'Error parsing response from Claude', details: error.message });
-            resolve();
-          }
+          console.log('Raw Claude response:', data); // Para debugging
+          resolve({ statusCode: proxyRes.statusCode, data });
         });
       });
 
       proxyReq.on('error', (error) => {
-        console.error('Request error:', error);
-        res.status(500).json({ error: 'Error connecting to Claude API', details: error.message });
-        resolve();
+        console.error('Claude API error:', error);
+        reject(error);
       });
 
-      proxyReq.write(JSON.stringify(requestBody));
+      proxyReq.write(JSON.stringify(claudeRequest));
       proxyReq.end();
     });
+
+    console.log('Claude response status:', claudeResponse.statusCode); // Para debugging
+
+    if (claudeResponse.statusCode !== 200) {
+      return res.status(claudeResponse.statusCode).send(claudeResponse.data);
+    }
+
+    const parsedResponse = JSON.parse(claudeResponse.data);
+    return res.status(200).json(parsedResponse);
+
   } catch (error) {
-    console.error('General error:', error);
-    res.status(500).json({ error: 'Internal server error', details: error.message });
+    console.error('Server error:', error);
+    return res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 };
