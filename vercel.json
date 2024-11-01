@@ -6,12 +6,8 @@
       "maxDuration": 10
     }
   },
-  "routes": [
-    {
-      "src": "/api/claude",
-      "methods": ["POST", "OPTIONS"],
-      "dest": "/api/claude.js"
-    }
+  "rewrites": [
+    { "source": "/api/claude", "destination": "/api/claude.js" }
   ],
   "headers": [
     {
