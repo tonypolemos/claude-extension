@@ -15,6 +15,6 @@
     "storage"
   ],
   "host_permissions": [
-      "https://claude-extension.vercel.app/*"
+    "https://claude-extension.vercel.app/*"
   ]
 }
