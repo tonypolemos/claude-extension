@@ -1,6 +1,12 @@
 const https = require('https');
 
 module.exports = async (req, res) => {
+  // Manejar CORS
+  res.setHeader('Access-Control-Allow-Credentials', true);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
+
   if (req.method === 'OPTIONS') {
     res.status(200).end();
     return;
@@ -12,6 +18,20 @@ module.exports = async (req, res) => {
   }
 
   try {
+    if (!process.env.CLAUDE_API_KEY) {
+      throw new Error('CLAUDE_API_KEY not configured');
+    }
+
+    const requestBody = {
+      model: req.body.model || "claude-3-opus-20240229",
+      max_tokens: req.body.max_tokens || 1024,
+      temperature: req.body.temperature || 0.7,
+      messages: req.body.messages,
+      system: req.body.system
+    };
+
+    console.log('Sending request to Claude:', JSON.stringify(requestBody));
+
     const options = {
       hostname: 'api.anthropic.com',
       path: '/v1/messages',
@@ -23,27 +43,39 @@ module.exports = async (req, res) => {
       }
     };
 
-    const proxyRequest = https.request(options, (proxyRes) => {
-      let data = '';
-      
-      proxyRes.on('data', (chunk) => {
-        data += chunk;
+    return new Promise((resolve, reject) => {
+      const proxyReq = https.request(options, (proxyRes) => {
+        let data = '';
+        
+        proxyRes.on('data', (chunk) => {
+          data += chunk;
+        });
+        
+        proxyRes.on('end', () => {
+          try {
+            console.log('Raw response from Claude:', data);
+            const responseData = JSON.parse(data);
+            res.status(proxyRes.statusCode).json(responseData);
+            resolve();
+          } catch (error) {
+            console.error('Error parsing response:', error);
+            res.status(500).json({ error: 'Error parsing response from Claude', details: error.message });
+            resolve();
+          }
+        });
       });
-      
-      proxyRes.on('end', () => {
-        res.status(proxyRes.statusCode).json(JSON.parse(data));
+
+      proxyReq.on('error', (error) => {
+        console.error('Request error:', error);
+        res.status(500).json({ error: 'Error connecting to Claude API', details: error.message });
+        resolve();
       });
-    });
 
-    proxyRequest.on('error', (error) => {
-      console.error('Error:', error);
-      res.status(500).json({ error: 'Internal server error' });
+      proxyReq.write(JSON.stringify(requestBody));
+      proxyReq.end();
     });
-
-    proxyRequest.write(JSON.stringify(req.body));
-    proxyRequest.end();
   } catch (error) {
-    console.error('Error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('General error:', error);
+    res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 };
