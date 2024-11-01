@@ -32,21 +32,25 @@ document.addEventListener('DOMContentLoaded', function() {
           messages: [{
             role: 'user',
             content: message
-          }],
-          model: "claude-3-opus-20240229",
-          max_tokens: 1024
+          }]
         })
       });
 
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const data = await response.json();
-      if (data.content) {
-        appendMessage(data.content[0].text, false);
+      console.log('Response from Claude:', data); // Para debugging
+
+      if (data && data.content) {
+        appendMessage(data.content, false);
       } else {
-        appendMessage('Error: Unable to get response from Claude', false);
+        appendMessage('Error: Invalid response format from Claude', false);
       }
     } catch (error) {
-      appendMessage('Error: Unable to connect to the server', false);
-      console.error('Error:', error);
+      console.error('Error details:', error);
+      appendMessage('Error: ' + error.message, false);
     }
 
     isWaitingForResponse = false;
